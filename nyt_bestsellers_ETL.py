@@ -12,17 +12,21 @@ from bs4 import BeautifulSoup
 import requests
 import datetime as DT
 
-weeksToSearch = 10 # how many weeks would you like to get data from
+# how many weeks would you like to get data from
+weeksToSearch = 2
 
-# search backwards from this date (must be +- 7 days from this date exactly)
+# search backwards from this date (year, month, day) 
+# must be +- 7 days from this date exactly
 curDate = DT.date(2021, 7, 18)
 
-def get_data(year, month, day):
+
+def get_nyt_data(year, month, day):
     """
-    This function takes in a date in (year, month, day) format and scrapes 
+    This function takes in a date in integer (year, month, day) format and scrapes 
     the NYT bestsellers list from that date. Returns a final list in the form:
     [[date, rank, category, title, author, # weeks on list, description]]
     """
+
     headers = {"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0", 
     "Accept-Encoding":"gzip, deflate", "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", 
     "DNT":"1","Connection":"close", "Upgrade-Insecure-Requests":"1"}
@@ -34,8 +38,8 @@ def get_data(year, month, day):
         day = "0" + day
 
     # request current dates NYT page for scraping
-    r = requests.get("https://www.nytimes.com/books/best-sellers/" + year + "/" +  month + "/" + day, headers=headers)
-    content = r.content
+    response = requests.get("https://www.nytimes.com/books/best-sellers/" + year + "/" +  month + "/" + day, headers=headers)
+    content = response.content
     soup = BeautifulSoup(content, features='lxml')
 
     # standardize date format
@@ -47,9 +51,11 @@ def get_data(year, month, day):
     categoryList = []
 
     # category was in a separate css section from rest of data
+    # so we need to get all of this data first
     for c in soup.findAll('section', attrs={'class':'e8j42380'}):
         category = c.find('a', attrs={'class':'css-nzgijy'})
         categoryList.append(category.text)
+
 
     # grab the rest of the data, clean it, and add each row to FinalList
     for d in soup.findAll('a', attrs={'class':'css-g5yn3w'}):
@@ -65,15 +71,20 @@ def get_data(year, month, day):
 
         workingList.append(categoryList[categoryNum])
 
+        # all categories are grabbed first and then the rest of the data,
+        # we need to keep categoryNum and rank consistent across all inputs
         if rank == 6:
             categoryNum += 1
             rank = 1
 
+        # input all of the data into our workingList 
+        # to append each row to FinalList
         if title is not None:
             workingList.append(title.text.title())
         else:
             workingList.append('Unknown')
         
+
         if author is not None:
             authors = author.text.split()
             # majority of text begins with "by AUTHOR NAME"
@@ -85,6 +96,8 @@ def get_data(year, month, day):
         else:
             workingList.append('Unknown')
 
+        # book that are new on the list this week do not list 0 or 1
+        # they are listed as "New", so append 1 when "New" is found
         if weeks is not None:
             weeksOnList = weeks.text.split()
             if weeksOnList[0] == "New":
@@ -94,11 +107,13 @@ def get_data(year, month, day):
         else:
             workingList.append('Unknown')
         
+
         if description is not None:
             workingList.append(description.text)
         else:
             workingList.append('Unknown')
 
+        # append newly generated and cleaned row to the FinalList
         FinalList.append(workingList)
     
     return FinalList
@@ -108,13 +123,16 @@ def get_data(year, month, day):
 
 results = []
 for i in range(weeksToSearch):
-    results.append(get_data(str(curDate.year), str(curDate.month), str(curDate.day)))
+    results.append(get_nyt_data(str(curDate.year), str(curDate.month), str(curDate.day)))
     curDate = curDate - DT.timedelta(days = 7)
 
 # transform data to work with pandas dataframe
 results2 = [item for sublist in results for item in sublist]
 
-df = pd.DataFrame(results2, columns=['Date', 'Rank', 'Category', 'Title', 'Author', 'Week on List', 'Description'])
+# Input results into dataframe and output to .csv file
+df = pd.DataFrame(results2, columns=['Date', 'Rank', 'Category', 'Title', 'Author', 'Weeks_on_List', 'Description'])
 df.to_csv('nyt_books.csv', index=False, encoding='utf-8')
 
 df = pd.read_csv('nyt_books.csv')
+
+data = df.sort_values(["Weeks_on_List"], axis=0, ascending=False)[:15]
