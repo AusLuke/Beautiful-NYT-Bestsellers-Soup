@@ -3,4 +3,4 @@ Current work in progress. Scraping NYT Best sellers list and creating csv file w
 
 Currently utilizing BeautifulSoup and pandas library
 
-As of July 14, 2021 data is successfully scraped and loaded into the csv file. Will be working on analyzing and visualizing the data in the coming days and weeks.
+2021 data is successfully scraped and loaded into the csv file. Can scrape up to 20 years of NYT Bestseller records right now. Currently working on scraping Amazon purchase links, and subsequently current Amazon price for each book
